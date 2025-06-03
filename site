@@ -1,0 +1,158 @@
+// 주요 프레임워크: React + TailwindCSS
+// 기능: 계층적 카테고리, 태그, 이미지 첨부, 검색, 태그 필터, 리치 텍스트 에디터
+
+import { useState, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tag, Search, Image as ImageIcon } from "lucide-react";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+
+const initialData = [
+  {
+    id: "1",
+    title: "세계관",
+    tags: ["#판타지", "#광대한세계"],
+    description: "이 세계의 전반적인 개요.",
+    image: null,
+    content: "<p>여기에 세계관 상세 설명이 들어갑니다.</p>",
+    children: [
+      {
+        id: "1-1",
+        title: "대륙",
+        tags: ["#지리", "#탐험"],
+        description: "주요 대륙 소개",
+        image: null,
+        content: "<p>각 대륙의 특징을 설명합니다.</p>",
+        children: [],
+      },
+    ],
+  },
+];
+
+export default function StoryBlog() {
+  const [tree, setTree] = useState(initialData);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTag, setActiveTag] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: "<p>내용을 입력하세요.</p>",
+  });
+
+  const searchTree = (nodes, term) => {
+    return nodes
+      .filter((node) => {
+        const matchesTerm =
+          node.title.toLowerCase().includes(term.toLowerCase()) ||
+          node.description.toLowerCase().includes(term.toLowerCase()) ||
+          node.content.toLowerCase().includes(term.toLowerCase());
+
+        const matchesTag =
+          !activeTag || node.tags.includes(activeTag);
+
+        return matchesTerm && matchesTag;
+      })
+      .map((node) => ({
+        ...node,
+        children: searchTree(node.children, term),
+      }));
+  };
+
+  const handleTagClick = (tag) => {
+    setActiveTag(tag === activeTag ? null : tag);
+  };
+
+  const renderTree = (nodes) => {
+    return nodes.map((node) => (
+      <div key={node.id} className="ml-4 mt-4">
+        <Card className="w-full">
+          <CardContent className="p-4">
+            <h2 className="font-bold text-lg">{node.title}</h2>
+            <p className="text-sm text-gray-500">{node.description}</p>
+            {node.image && (
+              <img
+                src={node.image}
+                alt="첨부 이미지"
+                className="mt-2 w-full max-w-md rounded shadow"
+              />
+            )}
+            <div
+              className="prose prose-sm mt-2"
+              dangerouslySetInnerHTML={{ __html: node.content }}
+            />
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {node.tags.map((tag, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleTagClick(tag)}
+                  className={`text-xs px-2 py-1 rounded-full border ${
+                    tag === activeTag
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-100 text-blue-800"
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            {node.children && node.children.length > 0 && (
+              <div className="ml-4 mt-4">{renderTree(node.children)}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    ));
+  };
+
+  const filteredTree = searchTerm ? searchTree(tree, searchTerm) : searchTree(tree, "");
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        alert("이미지 업로드 기능 데모: " + e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">📚 내 스토리 정리소</h1>
+
+      <div className="flex items-center gap-2 mb-4">
+        <Search className="text-gray-500" />
+        <Input
+          type="text"
+          placeholder="카테고리, 태그, 텍스트 검색"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <div className="border p-4 rounded-lg mb-6">
+        <h2 className="font-semibold mb-2">✍️ 리치 텍스트 에디터</h2>
+        <EditorContent editor={editor} className="prose prose-sm border p-2 bg-white rounded shadow" />
+        <div className="mt-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+            className="hidden"
+            accept="image/*"
+          />
+          <Button variant="outline" onClick={() => fileInputRef.current.click()}>
+            <ImageIcon className="w-4 h-4 mr-2" /> 이미지 업로드
+          </Button>
+        </div>
+      </div>
+
+      <div>{renderTree(filteredTree)}</div>
+    </div>
+  );
+}
